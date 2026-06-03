@@ -6,11 +6,10 @@ export class AccessTokenDenyList extends Document {
   @Prop({ required: true, unique: true })
   jti!: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, expires: 0 })
   expiresAt!: Date;
 }
 
 export const AccessTokenDenyListSchema =
   SchemaFactory.createForClass(AccessTokenDenyList);
 
-AccessTokenDenyListSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

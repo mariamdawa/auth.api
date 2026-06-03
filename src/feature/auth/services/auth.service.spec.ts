@@ -183,7 +183,7 @@ describe('AuthService', () => {
   });
 
   describe('logout', () => {
-    const accessTokenJti = 'at-jti';
+    const accessToken = 'some-access-token';
     const refreshTokenJti = 'rt-jti';
     const storedRefreshToken = { _id: 'token-id' };
 
@@ -191,7 +191,7 @@ describe('AuthService', () => {
       mockRefreshTokenService.findOne.mockResolvedValue(storedRefreshToken);
       mockJwtService.decode.mockReturnValue({ exp: Date.now() / 1000 + 3600 });
 
-      await service.logout(accessTokenJti, refreshTokenJti);
+      await service.logout(accessToken, refreshTokenJti);
 
       expect(mockRefreshTokenService.findOne).toHaveBeenCalledWith(
         refreshTokenJti,
@@ -200,7 +200,7 @@ describe('AuthService', () => {
         storedRefreshToken._id,
       );
       expect(mockAccessTokenDenyListService.add).toHaveBeenCalledWith(
-        accessTokenJti,
+        accessToken,
         expect.any(Date),
       );
     });
@@ -210,7 +210,7 @@ describe('AuthService', () => {
       mockJwtService.decode.mockReturnValue({ exp: Date.now() / 1000 + 3600 });
 
       await expect(
-        service.logout(accessTokenJti, refreshTokenJti),
+        service.logout(accessToken, refreshTokenJti),
       ).resolves.not.toThrow();
       expect(mockRefreshTokenService.revoke).not.toHaveBeenCalled();
       expect(mockAccessTokenDenyListService.add).toHaveBeenCalled();

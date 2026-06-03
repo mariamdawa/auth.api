@@ -68,14 +68,11 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   async logout(@Body() logoutDto: LogoutDto, @HeaderToken() accessToken: string): Promise<void> {
-      const refreshTokenId = logoutDto.jti; // Assuming refresh token is sent in the body
-
-    // We decode without verification as the token might be expired, which is fine for logout.
-    const at = this.jwtService.decode(accessToken) as { jti: string };
+    const refreshTokenId = logoutDto.jti; // Assuming refresh token is sent in the body
 
     // We proceed with logout even if tokens are invalid, to ensure cleanup.
     // The service should handle cases where jti might be null.
-    return this.authService.logout(at?.jti, refreshTokenId);
+    return this.authService.logout(accessToken, refreshTokenId);
   }
 
   @Post('refresh')

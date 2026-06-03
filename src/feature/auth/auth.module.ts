@@ -7,6 +7,7 @@ import { AppConfigModule } from 'src/base/app-config/app-config.module';
 import { AccessTokenDenyListRepository } from 'src/data/repo/access-token-denylist.repository';
 import { RefreshTokenRepository } from 'src/data/repo/refresh-token.repository';
 import { UsersModule } from 'src/feature/users/users.module';
+import { UsersService } from '../users/users.service';
 import { AuthController } from './auth.controller';
 import {
   AccessTokenDenyList,
@@ -42,6 +43,7 @@ import { LogoutStrategy } from './strategies/logout.strategy';
     LogoutStrategy,
     RefreshTokenRepository,
     AccessTokenDenyListRepository,
+    UsersService
   ],
   controllers: [AuthController],
 })

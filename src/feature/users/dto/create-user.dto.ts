@@ -9,7 +9,7 @@ export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(3)
-  name: string;
+  name!: string;
 
   @ApiProperty({
     example: 'john.doe@example.com',
@@ -17,7 +17,7 @@ export class CreateUserDto {
   })
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
   @ApiProperty({
     example: 'Password123!',
@@ -29,5 +29,5 @@ export class CreateUserDto {
   @Matches(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+[\]{};':"\\|,.<>/?~`]).*$/, {
     message: 'Password must contain at least one letter, one number, and one special character',
   })
-  password: string;
+  password!: string;
 }

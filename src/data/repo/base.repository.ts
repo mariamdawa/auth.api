@@ -17,14 +17,14 @@ export abstract class BaseRepository<T extends Document> {
     filterQuery: QueryFilter<T>,
     options?: QueryOptions<T>,
   ): Promise<T | null> {
-    return this.model.findOne(filterQuery, options);
+    return this.model.findOne(filterQuery, undefined, options);
   }
 
   async find(
     filterQuery: QueryFilter<T>,
     options?: QueryOptions<T>,
   ): Promise<T[]> {
-    return this.model.find(filterQuery, options);
+    return this.model.find(filterQuery, undefined, options);
   }
 
   async updateOne(
@@ -34,7 +34,7 @@ export abstract class BaseRepository<T extends Document> {
   ): Promise<T | null> {
     return this.model.findOneAndUpdate(filterQuery, updateQuery, {
       ...options,
-      new: true,
+      returnDocument: 'after',
     });
   }
 
