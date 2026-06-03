@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AppConfig } from 'src/base/app-config/app.config';
-import { HashUtil } from 'src/common/utils/hash.util';
+import { compareHash, hashText } from 'src/common/utils/hash.util';
 import { User } from 'src/feature/users/schemas/user.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateUserDto } from '../../users/dto/create-user.dto';
@@ -34,7 +34,7 @@ export class AuthService {
       throw new ConflictException('Email already exists');
     }
 
-    const hashedPassword = await HashUtil.hashText(createUserDto.password);
+    const hashedPassword = await hashText(createUserDto.password);
     const newUser = await this.usersService.create({
       ...createUserDto,
       password: hashedPassword,
@@ -67,7 +67,7 @@ export class AuthService {
       }),
     ]);
 
-    const hashedRefreshToken = await HashUtil.hashText(refreshToken);
+    const hashedRefreshToken = await hashText(refreshToken);
     const expiresAt = new Date();
     expiresAt.setSeconds(
       expiresAt.getSeconds() +
@@ -88,7 +88,7 @@ export class AuthService {
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const user = await this.usersService.findOneByEmail(loginDto.email);
 
-    if (!user || !(await HashUtil.compareHash(loginDto.password, user.password))) {
+    if (!user || !(await compareHash(loginDto.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -130,7 +130,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token not found');
     }
 
-    const isMatch = await HashUtil.compareHash(
+    const isMatch = await compareHash(
       refreshToken,
       storedToken.hashedToken,
     );

@@ -5,8 +5,7 @@ import {
   HttpStatus,
   Post,
   Req,
-  UseGuards,
-  ValidationPipe,
+  UseGuards
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
@@ -30,7 +29,7 @@ export class AuthController {
   @Public()
   @Post('signup')
   async signup(
-    @Body(new ValidationPipe()) createUserDto: CreateUserDto,
+    @Body() createUserDto: CreateUserDto,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     return this.authService.signup(createUserDto);
   }
@@ -39,7 +38,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
-    @Body(new ValidationPipe()) loginDto: LoginDto,
+    @Body() loginDto: LoginDto,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     return this.authService.login(loginDto);
   }
