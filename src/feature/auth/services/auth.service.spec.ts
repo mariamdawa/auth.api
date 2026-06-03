@@ -8,13 +8,11 @@ import { AccessTokenDenyList } from '../schemas/accessTokenDenyList.schema';
 import { RefreshToken } from '../schemas/refreshToken.schema';
 import { AccessTokenDenyListService } from './accessTokenDenyList.service';
 import { AuthService } from './auth.service';
-import { RefreshTokenService } from './refreshToken.service';
 
 describe('AuthService', () => {
   let service: AuthService;
   let usersService: UsersService;
   let jwtService: JwtService;
-  let refreshTokenService: RefreshTokenService;
   let accessTokenDenyListService: AccessTokenDenyListService;
 
   const mockUsersService = {
@@ -56,7 +54,6 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: AppConfig, useValue: mockAppConfig },
-        { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         {
           provide: AccessTokenDenyListService,
           useValue: mockAccessTokenDenyListService,
@@ -74,7 +71,6 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
     usersService = module.get<UsersService>(UsersService);
     jwtService = module.get<JwtService>(JwtService);
-    refreshTokenService = module.get<RefreshTokenService>(RefreshTokenService);
     accessTokenDenyListService = module.get<AccessTokenDenyListService>(
       AccessTokenDenyListService,
     );

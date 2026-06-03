@@ -6,37 +6,37 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { AppConfig } from 'src/base/app-config/app.config';
 import { compareHash, hashText } from 'src/common/utils/hash.util';
+import { AccessTokenDenyListRepository } from 'src/data/repo/access-token-denylist.repository';
+import { RefreshTokenRepository } from 'src/data/repo/refresh-token.repository';
+import { UsersRepository } from 'src/data/repo/users.repository';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateUserDto } from '../../users/dto/create-user.dto';
-import { UsersService } from '../../users/users.service';
 import { LoginDto } from '../dto/login.dto';
 import { CurrentUser } from '../types/current-user.type';
 import { Tokens } from '../types/tokens.type';
-import { AccessTokenDenyListService } from './accessTokenDenyList.service';
-import { RefreshTokenService } from './refreshToken.service';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UsersService,
+    private readonly usersRepository: UsersRepository,
+    private readonly refreshTokenRepository: RefreshTokenRepository,
+    private readonly accessTokenDenyListRepository: AccessTokenDenyListRepository,
     private readonly jwtService: JwtService,
     private readonly appConfig: AppConfig,
-    private readonly refreshTokenService: RefreshTokenService,
-    private readonly accessTokenDenyListService: AccessTokenDenyListService,
   ) {}
 
   async signup(
     createUserDto: CreateUserDto,
   ): Promise<Tokens> {
-    const existingUser = await this.usersService.findOneByEmail(
-      createUserDto.email,
-    );
+    const existingUser = await this.usersRepository.findOne({
+      email: createUserDto.email,
+    });
     if (existingUser) {
       throw new ConflictException('Email already exists');
     }
 
     const hashedPassword = await hashText(createUserDto.password);
-    const newUser = await this.usersService.create({
+    const newUser = await this.usersRepository.create({
       ...createUserDto,
       password: hashedPassword,
     });
@@ -76,11 +76,11 @@ export class AuthService {
         parseInt(this.appConfig.config.jwt.refreshTokenExpiration),
     );
 
-    await this.refreshTokenService.create(
-      newRefreshTokenId,
-      hashedRefreshToken,
+    await this.refreshTokenRepository.create({
+      jti: newRefreshTokenId,
+      hashedToken: hashedRefreshToken,
       expiresAt,
-    );
+    });
 
     return { accessToken, refreshToken };
   }
@@ -88,7 +88,7 @@ export class AuthService {
   async login(
     loginDto: LoginDto,
   ): Promise<Tokens> {
-    const user = await this.usersService.findOneByEmail(loginDto.email);
+    const user = await this.usersRepository.findOne({ email: loginDto.email }, { select: '+password' });
 
     if (!user || !(await compareHash(loginDto.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
@@ -105,9 +105,9 @@ export class AuthService {
   async logout(accessTokenJti: string, refreshTokenJti: string): Promise<void> {
     if (refreshTokenJti) {
       const storedToken =
-        await this.refreshTokenService.findOne(refreshTokenJti);
+        await this.refreshTokenRepository.findOne({ jti: refreshTokenJti });
       if (storedToken) {
-        await this.refreshTokenService.revoke(storedToken._id);
+        await this.refreshTokenRepository.updateOne({ _id: storedToken._id }, { isRevoked: true });
       }
     }
 
@@ -117,7 +117,7 @@ export class AuthService {
       };
       if (decodedToken && decodedToken.exp) {
         const expiresAt = new Date(decodedToken.exp * 1000);
-        await this.accessTokenDenyListService.add(accessTokenJti, expiresAt);
+        await this.accessTokenDenyListRepository.create({ jti: accessTokenJti, expiresAt });
       }
     }
   }
@@ -127,7 +127,7 @@ export class AuthService {
     user: CurrentUser,
   ): Promise<Tokens> {
     const decoded = this.jwtService.decode(refreshToken) as { jti: string };
-    const storedToken = await this.refreshTokenService.findOne(decoded.jti);
+    const storedToken = await this.refreshTokenRepository.findOne({ jti: decoded.jti });
 
     if (!storedToken) {
       throw new UnauthorizedException('Refresh token not found');
@@ -138,7 +138,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    await this.refreshTokenService.revoke(storedToken._id);
+    await this.refreshTokenRepository.updateOne({ _id: storedToken._id }, { isRevoked: true });
 
     return this.generateTokens(user);
   }

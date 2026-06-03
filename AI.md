@@ -93,5 +93,12 @@ This section details the iterative process of designing and implementing a robus
 -   **AI Action & Correction:** The AI's first attempt was to make the logout endpoint public, which the developer correctly identified as a security risk. Following the developer's precise and superior architectural guidance, the AI created a new `logout.strategy.ts`. This strategy was configured with `ignoreExpiration: true`, a `LogoutGuard` to protect the endpoint, and the `AuthController` was updated to use it.
 -   **Outcome:** This resulted in a highly secure and robust logout mechanism. It ensures that only requests with a validly signed token can initiate a logout, but it gracefully handles expired tokens, allowing the system to revoke the associated refresh token and denylist the access token correctly. This is a nuanced and professional-grade solution.
 
+### 7. Implementing the Repository Pattern
+
+-   **Developer's Goal:** To abstract the data access layer, making the application more modular, testable, and maintainable.
+-   **Prompt/Guidance:** "create repository pattern class for our collections, create a base-repository class in the data folder, and implement it for refresh-token.repo access-token-denylist.repo and users.repo, this class should have the basic repo functions like findOne(), create() deleteOne delete,updateone and so on"
+-   **AI Action:** The AI understood the request and created a generic `BaseRepository` with common CRUD methods. It then created concrete `UsersRepository`, `RefreshTokenRepository`, and `AccessTokenDenyListRepository` classes that extended the base repository. Finally, it refactored the `AuthService` and `UsersService` to use these new repositories, and updated the corresponding modules to provide them.
+-   **Outcome:** This refactoring successfully decoupled the business logic from the data access logic, adhering to the single responsibility principle. It makes the services easier to test by allowing repositories to be mocked, and it centralizes all database interactions.
+
 ---
 *This document will be updated as development continues.*

@@ -1,27 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Types } from 'mongoose';
+import { UsersRepository } from 'src/data/repo/users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { User } from './schemas/user.schema';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(private readonly usersRepository: UsersRepository) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const createdUser = new this.userModel(createUserDto);
-    return createdUser.save();
+    return this.usersRepository.create(createUserDto);
   }
 
-  async findOneByEmail(email: string): Promise<User | undefined> {
-    return this.userModel.findOne({ email }).select('+password');
+  async findOneByEmail(email: string): Promise<User | null> {
+    return this.usersRepository.findOne({ email }, { select: '+password' });
   }
 
   async findOneById(id: string): Promise<User | null | undefined> {
-    return this.userModel.findById(id);
+    return this.usersRepository.findOne({ _id: id });
   }
 
   async updateRefreshToken(id: Types.ObjectId, refreshToken: string | null): Promise<void> {
-    await this.userModel.findByIdAndUpdate(id, { refreshToken });
+    await this.usersRepository.updateOne({ _id: id }, { refreshToken });
   }
 }

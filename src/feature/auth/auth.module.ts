@@ -4,6 +4,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
 import { AppConfigModule } from 'src/base/app-config/app-config.module';
+import { AccessTokenDenyListRepository } from 'src/data/repo/access-token-denylist.repository';
+import { RefreshTokenRepository } from 'src/data/repo/refresh-token.repository';
 import { UsersModule } from 'src/feature/users/users.module';
 import { AuthController } from './auth.controller';
 import {
@@ -16,7 +18,6 @@ import {
 } from './schemas/refreshToken.schema';
 import { AccessTokenDenyListService } from './services/accessTokenDenyList.service';
 import { AuthService } from './services/auth.service';
-import { RefreshTokenService } from './services/refreshToken.service';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LogoutStrategy } from './strategies/logout.strategy';
@@ -35,11 +36,12 @@ import { LogoutStrategy } from './strategies/logout.strategy';
   ],
   providers: [
     AuthService,
+    AccessTokenDenyListService,
     JwtStrategy,
     JwtRefreshStrategy,
     LogoutStrategy,
-    RefreshTokenService,
-    AccessTokenDenyListService,
+    RefreshTokenRepository,
+    AccessTokenDenyListRepository,
   ],
   controllers: [AuthController],
 })
