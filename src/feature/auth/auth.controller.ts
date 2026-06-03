@@ -4,21 +4,27 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Req,
   UseGuards
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { Request } from 'express';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { HeaderToken } from 'src/common/decorators/header-token.decorator';
-import { User as UserDto } from 'src/feature/users/schemas/user.schema';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { User } from './decorators/get-current-user.decorator';
-import { Public } from './decorators/public.decorator';
 import { LoginDto } from './dto/login.dto';
+import { LogoutDto } from './dto/refresh.dto';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { LogoutGuard } from './guards/logout.guard';
 import { AuthService } from './services/auth.service';
+import type { CurrentUser } from './types/current-user.type';
+import { Tokens } from './types/tokens.type';
 
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -26,28 +32,43 @@ export class AuthController {
     private readonly jwtService: JwtService,
   ) {}
 
-  @Public()
   @Post('signup')
-  async signup(
-    @Body() createUserDto: CreateUserDto,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new user' })
+  @ApiResponse({
+    status: 201,
+    description: 'The user has been successfully created.',
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 409, description: 'Conflict. User already exists.' })
+  async signup(@Body() createUserDto: CreateUserDto): Promise<Tokens> {
     return this.authService.signup(createUserDto);
   }
 
-  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(
-    @Body() loginDto: LoginDto,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  @ApiOperation({ summary: 'Log in a user' })
+  @ApiResponse({
+    status: 200,
+    description: 'The user has been successfully logged in.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  async login(@Body() loginDto: LoginDto): Promise<Tokens> {
     return this.authService.login(loginDto);
   }
 
-  @UseGuards(LogoutGuard)
   @Post('logout')
+  @UseGuards(LogoutGuard)
   @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: Request, @HeaderToken() accessToken: string): Promise<void> {
-    const refreshTokenId = req.body.jti; // Assuming refresh token is sent in the body
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Log out a user' })
+  @ApiResponse({
+    status: 200,
+    description: 'The user has been successfully logged out.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  async logout(@Body() logoutDto: LogoutDto, @HeaderToken() accessToken: string): Promise<void> {
+      const refreshTokenId = logoutDto.jti; // Assuming refresh token is sent in the body
 
     // We decode without verification as the token might be expired, which is fine for logout.
     const at = this.jwtService.decode(accessToken) as { jti: string };
@@ -57,13 +78,21 @@ export class AuthController {
     return this.authService.logout(at?.jti, refreshTokenId);
   }
 
-  @UseGuards(JwtRefreshGuard)
   @Post('refresh')
+  @UseGuards(JwtRefreshGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Refresh the access token' })
+  @ApiResponse({
+    status: 200,
+    description: 'The access token has been successfully refreshed.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
   async refresh(
-    @User() user: UserDto,
+    @User() user: CurrentUser,
     @HeaderToken() refreshToken: string,
-  ): Promise<{ accessToken: string; }> {
-    return this.authService.refresh(refreshToken, user);
+  ): Promise<Tokens> {
+       return this.authService.refresh(refreshToken, user);
   }
+
 }

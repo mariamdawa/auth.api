@@ -4,10 +4,10 @@ import { Document } from 'mongoose';
 @Schema({ timestamps: true })
 export class AccessTokenDenyList extends Document {
   @Prop({ required: true, unique: true })
-  jti: string;
+  jti!: string;
 
   @Prop({ required: true })
-  expiresAt: Date;
+  expiresAt!: Date;
 }
 
 export const AccessTokenDenyListSchema =

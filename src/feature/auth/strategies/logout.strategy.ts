@@ -2,16 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AppConfig } from 'src/base/app-config/app.config';
-
-type JwtPayload = {
-  sub: string;
-  email: string;
-  jti: string;
-};
+import { CurrentUser } from '../types/current-user.type';
 
 @Injectable()
 export class LogoutStrategy extends PassportStrategy(Strategy, 'logout') {
-  constructor(private readonly appConfig: AppConfig) {
+  constructor(readonly appConfig: AppConfig) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: appConfig.config.jwt.accessTokenSecret,
@@ -19,7 +14,7 @@ export class LogoutStrategy extends PassportStrategy(Strategy, 'logout') {
     });
   }
 
-  validate(payload: JwtPayload): JwtPayload {
+  validate(payload: CurrentUser): CurrentUser {
     // The token's signature is verified by passport before this method is called.
     // We simply return the payload, which includes the jti needed for denylisting.
     return payload;

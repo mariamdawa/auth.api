@@ -6,11 +6,12 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { AppConfig } from 'src/base/app-config/app.config';
 import { compareHash, hashText } from 'src/common/utils/hash.util';
-import { User } from 'src/feature/users/schemas/user.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateUserDto } from '../../users/dto/create-user.dto';
 import { UsersService } from '../../users/users.service';
 import { LoginDto } from '../dto/login.dto';
+import { CurrentUser } from '../types/current-user.type';
+import { Tokens } from '../types/tokens.type';
 import { AccessTokenDenyListService } from './accessTokenDenyList.service';
 import { RefreshTokenService } from './refreshToken.service';
 
@@ -26,7 +27,7 @@ export class AuthService {
 
   async signup(
     createUserDto: CreateUserDto,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  ): Promise<Tokens> {
     const existingUser = await this.usersService.findOneByEmail(
       createUserDto.email,
     );
@@ -39,19 +40,20 @@ export class AuthService {
       ...createUserDto,
       password: hashedPassword,
     });
+    const payload: CurrentUser = {
+      id: newUser._id.toString(),
+      name: newUser.name,
+      email: newUser.email,
+    };
 
-    return this.generateTokens(newUser);
+    return this.generateTokens(payload);
   }
 
   private async generateTokens(
-    user: User,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
-    const refreshTokenId = uuidv4();
-    const payload = {
-      email: user.email,
-      sub: user._id.toString(),
-      jti: refreshTokenId, // jti of refresh token is the link
-    };
+    payload: CurrentUser,
+  ): Promise<Tokens> {
+    const newRefreshTokenId = uuidv4();
+    payload.jti = newRefreshTokenId; // Generate a unique identifier for the refresh token (jti)
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
@@ -75,7 +77,7 @@ export class AuthService {
     );
 
     await this.refreshTokenService.create(
-      refreshTokenId,
+      newRefreshTokenId,
       hashedRefreshToken,
       expiresAt,
     );
@@ -85,24 +87,25 @@ export class AuthService {
 
   async login(
     loginDto: LoginDto,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  ): Promise<Tokens> {
     const user = await this.usersService.findOneByEmail(loginDto.email);
 
     if (!user || !(await compareHash(loginDto.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    const payload: CurrentUser = {
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+    };
 
-    return this.generateTokens(user);
+    return this.generateTokens(payload);
   }
 
-  async logout(
-    accessTokenJti: string,
-    refreshTokenJti: string,
-  ): Promise<void> {
+  async logout(accessTokenJti: string, refreshTokenJti: string): Promise<void> {
     if (refreshTokenJti) {
-      const storedToken = await this.refreshTokenService.findOne(
-        refreshTokenJti,
-      );
+      const storedToken =
+        await this.refreshTokenService.findOne(refreshTokenJti);
       if (storedToken) {
         await this.refreshTokenService.revoke(storedToken._id);
       }
@@ -121,8 +124,8 @@ export class AuthService {
 
   async refresh(
     refreshToken: string,
-    user: User,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+    user: CurrentUser,
+  ): Promise<Tokens> {
     const decoded = this.jwtService.decode(refreshToken) as { jti: string };
     const storedToken = await this.refreshTokenService.findOne(decoded.jti);
 
@@ -130,10 +133,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token not found');
     }
 
-    const isMatch = await compareHash(
-      refreshToken,
-      storedToken.hashedToken,
-    );
+    const isMatch = await compareHash(refreshToken, storedToken.hashedToken);
     if (!isMatch) {
       throw new UnauthorizedException('Invalid refresh token');
     }

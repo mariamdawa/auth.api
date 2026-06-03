@@ -15,7 +15,9 @@ export class AccessTokenDenyListService {
     await createdToken.save();
   }
 
-  async isDenylisted(jti: string): Promise<boolean> {
+  async isDenylisted(jti: string | undefined): Promise<boolean> {
+    if (!jti) return false;
+
     const token = await this.denyListModel.findOne({ jti }).exec();
     return !!token;
   }
