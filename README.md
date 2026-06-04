@@ -33,7 +33,7 @@ This repository contains a starter project for a NestJS-based authentication API
 
 1.  Clone the repository:
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/mariamdawa/auth.api
     cd auth-api
     ```
 
