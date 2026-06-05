@@ -6,7 +6,6 @@ import {
   Post,
   UseGuards
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -29,7 +28,6 @@ import { Tokens } from './types/tokens.type';
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly jwtService: JwtService,
   ) {}
 
   @Post('signup')

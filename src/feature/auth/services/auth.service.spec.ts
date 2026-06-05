@@ -1,22 +1,33 @@
 import { JwtService } from '@nestjs/jwt';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
+import { AccessTokenDenyListRepository } from 'src/data/repo/access-token-denylist.repository';
+import { RefreshTokenRepository } from 'src/data/repo/refresh-token.repository';
+import { UsersRepository } from 'src/data/repo/users.repository';
 import { AppConfig } from '../../../base/app-config/app.config';
+import * as HashUtil from '../../../common/utils/hash.util';
 import { User } from '../../users/schemas/user.schema';
 import { UsersService } from '../../users/users.service';
 import { AccessTokenDenyList } from '../schemas/accessTokenDenyList.schema';
 import { RefreshToken } from '../schemas/refreshToken.schema';
-import { AccessTokenDenyListService } from './accessTokenDenyList.service';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
   let usersService: UsersService;
   let jwtService: JwtService;
-  let accessTokenDenyListService: AccessTokenDenyListService;
+  let accessTokenDenyListRepository: AccessTokenDenyListRepository;
+  
+  // Base repository mock with all common methods
+  const createMockRepository = () => ({
+    create: jest.fn(),
+    findOne: jest.fn(),
+    find: jest.fn(),
+    updateOne: jest.fn(),
+    deleteOne: jest.fn(),
+  });
 
   const mockUsersService = {
-    create: jest.fn(),
     findOneByEmail: jest.fn(),
   };
 
@@ -25,16 +36,9 @@ describe('AuthService', () => {
     decode: jest.fn(),
   };
 
-  const mockRefreshTokenService = {
-    create: jest.fn(),
-    findOne: jest.fn(),
-    revoke: jest.fn(),
-  };
-
-  const mockAccessTokenDenyListService = {
-    add: jest.fn(),
-    isDenylisted: jest.fn(),
-  };
+  const mockUsersRepository = createMockRepository();
+  const mockRefreshTokenRepository = createMockRepository();
+  const mockAccessTokenDenyListRepository = createMockRepository();
 
   const mockAppConfig = {
     config: {
@@ -51,12 +55,14 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
+        { provide: UsersRepository, useValue: mockUsersRepository },
+        { provide: RefreshTokenRepository, useValue: mockRefreshTokenRepository },
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: AppConfig, useValue: mockAppConfig },
         {
-          provide: AccessTokenDenyListService,
-          useValue: mockAccessTokenDenyListService,
+          provide: AccessTokenDenyListRepository,
+          useValue: mockAccessTokenDenyListRepository,
         },
         // We don't need the actual models, so we can provide dummy values
         { provide: getModelToken(User.name), useValue: jest.fn() },
@@ -71,8 +77,8 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
     usersService = module.get<UsersService>(UsersService);
     jwtService = module.get<JwtService>(JwtService);
-    accessTokenDenyListService = module.get<AccessTokenDenyListService>(
-      AccessTokenDenyListService,
+    accessTokenDenyListRepository = module.get<AccessTokenDenyListRepository>(
+      AccessTokenDenyListRepository,
     );
   });
 
@@ -97,20 +103,20 @@ describe('AuthService', () => {
 
     it('should create a new user and return tokens if email is not taken', async () => {
       mockUsersService.findOneByEmail.mockResolvedValue(null);
-      mockUsersService.create.mockResolvedValue(newUser);
+      mockUsersRepository.create.mockResolvedValue(newUser);
       mockJwtService.signAsync
         .mockResolvedValueOnce(tokens.accessToken)
         .mockResolvedValueOnce(tokens.refreshToken);
-      mockRefreshTokenService.create.mockResolvedValue(undefined);
+      mockRefreshTokenRepository.create.mockResolvedValue(undefined);
 
       const result = await service.signup(createUserDto);
 
       expect(mockUsersService.findOneByEmail).toHaveBeenCalledWith(
         createUserDto.email,
       );
-      expect(mockUsersService.create).toHaveBeenCalled();
+      expect(mockUsersRepository.create).toHaveBeenCalled();
       expect(mockJwtService.signAsync).toHaveBeenCalledTimes(2);
-      expect(mockRefreshTokenService.create).toHaveBeenCalled();
+      expect(mockRefreshTokenRepository.create).toHaveBeenCalled();
       expect(result).toEqual(tokens);
     });
 
@@ -142,14 +148,13 @@ describe('AuthService', () => {
 
     it('should return tokens on successful login', async () => {
       mockUsersService.findOneByEmail.mockResolvedValue(user);
-      // Mocking the static method of HashUtil
-      const HashUtil = require('src/common/utils/hash.util').HashUtil;
+      // Mocking the compareHash function
       jest.spyOn(HashUtil, 'compareHash').mockResolvedValue(true);
 
       mockJwtService.signAsync
         .mockResolvedValueOnce(tokens.accessToken)
         .mockResolvedValueOnce(tokens.refreshToken);
-      mockRefreshTokenService.create.mockResolvedValue(undefined);
+      mockRefreshTokenRepository.create.mockResolvedValue(undefined);
 
       const result = await service.login(loginDto);
 
@@ -173,7 +178,6 @@ describe('AuthService', () => {
 
     it('should throw an UnauthorizedException for invalid credentials (wrong password)', async () => {
       mockUsersService.findOneByEmail.mockResolvedValue(user);
-      const HashUtil = require('src/common/utils/hash.util').HashUtil;
       jest.spyOn(HashUtil, 'compareHash').mockResolvedValue(false);
 
       await expect(service.login(loginDto)).rejects.toThrow(
@@ -188,32 +192,31 @@ describe('AuthService', () => {
     const storedRefreshToken = { _id: 'token-id' };
 
     it('should revoke refresh token and denylist access token', async () => {
-      mockRefreshTokenService.findOne.mockResolvedValue(storedRefreshToken);
-      mockJwtService.decode.mockReturnValue({ exp: Date.now() / 1000 + 3600 });
+      mockRefreshTokenRepository.updateOne.mockResolvedValue(storedRefreshToken);
+      mockJwtService.decode.mockReturnValue({ jti: 'at-jti', exp: Date.now() / 1000 + 3600 });
+      mockAccessTokenDenyListRepository.create.mockResolvedValue(undefined);
 
       await service.logout(accessToken, refreshTokenJti);
 
-      expect(mockRefreshTokenService.findOne).toHaveBeenCalledWith(
-        refreshTokenJti,
+      expect(mockRefreshTokenRepository.updateOne).toHaveBeenCalledWith(
+        { jti: refreshTokenJti },
+        { isRevoked: true },
       );
-      expect(mockRefreshTokenService.revoke).toHaveBeenCalledWith(
-        storedRefreshToken._id,
-      );
-      expect(mockAccessTokenDenyListService.add).toHaveBeenCalledWith(
-        accessToken,
-        expect.any(Date),
-      );
+      expect(mockAccessTokenDenyListRepository.create).toHaveBeenCalledWith({
+        jti: 'at-jti',
+        expiresAt: expect.any(Date),
+      });
     });
 
     it('should not throw if refresh token is not found', async () => {
-      mockRefreshTokenService.findOne.mockResolvedValue(null);
-      mockJwtService.decode.mockReturnValue({ exp: Date.now() / 1000 + 3600 });
+      mockRefreshTokenRepository.updateOne.mockResolvedValue(null);
+      mockJwtService.decode.mockReturnValue({ jti: 'at-jti', exp: Date.now() / 1000 + 3600 });
+      mockAccessTokenDenyListRepository.create.mockResolvedValue(undefined);
 
       await expect(
         service.logout(accessToken, refreshTokenJti),
       ).resolves.not.toThrow();
-      expect(mockRefreshTokenService.revoke).not.toHaveBeenCalled();
-      expect(mockAccessTokenDenyListService.add).toHaveBeenCalled();
+      expect(mockAccessTokenDenyListRepository.create).toHaveBeenCalled();
     });
   });
 
@@ -232,48 +235,53 @@ describe('AuthService', () => {
 
     it('should return new tokens on successful refresh', async () => {
       mockJwtService.decode.mockReturnValue(decodedToken);
-      mockRefreshTokenService.findOne.mockResolvedValue(storedToken);
-      const HashUtil = require('src/common/utils/hash.util').HashUtil;
+      mockRefreshTokenRepository.findOne.mockResolvedValue(storedToken);
       jest.spyOn(HashUtil, 'compareHash').mockResolvedValue(true);
-      mockRefreshTokenService.revoke.mockResolvedValue(undefined);
+      mockRefreshTokenRepository.updateOne.mockResolvedValue(undefined);
       // Mock generateTokens internal calls
       mockJwtService.signAsync
         .mockResolvedValueOnce(newTokens.accessToken)
         .mockResolvedValueOnce(newTokens.refreshToken);
-      mockRefreshTokenService.create.mockResolvedValue(undefined);
+      mockRefreshTokenRepository.create.mockResolvedValue(undefined);
 
       const result = await service.refresh(refreshToken, user as any);
 
-      expect(mockRefreshTokenService.findOne).toHaveBeenCalledWith(
-        decodedToken.jti,
+      expect(mockRefreshTokenRepository.findOne).toHaveBeenCalledWith(
+        { jti: decodedToken.jti },
       );
       expect(HashUtil.compareHash).toHaveBeenCalledWith(
         refreshToken,
         storedToken.hashedToken,
       );
-      expect(mockRefreshTokenService.revoke).toHaveBeenCalledWith(
-        storedToken._id,
+      expect(mockRefreshTokenRepository.updateOne).toHaveBeenCalledWith(
+        { _id: storedToken._id },
+        { isRevoked: true },
       );
       expect(result).toEqual(newTokens);
     });
 
     it('should throw UnauthorizedException if refresh token not found', async () => {
       mockJwtService.decode.mockReturnValue(decodedToken);
-      mockRefreshTokenService.findOne.mockResolvedValue(null);
+      mockRefreshTokenRepository.findOne.mockResolvedValue(null);
 
       await expect(service.refresh(refreshToken, user as any)).rejects.toThrow(
         'Refresh token not found',
+      );
+      expect(mockRefreshTokenRepository.findOne).toHaveBeenCalledWith(
+        { jti: decodedToken.jti },
       );
     });
 
     it('should throw UnauthorizedException if refresh token is invalid', async () => {
       mockJwtService.decode.mockReturnValue(decodedToken);
-      mockRefreshTokenService.findOne.mockResolvedValue(storedToken);
-      const HashUtil = require('src/common/utils/hash.util').HashUtil;
+      mockRefreshTokenRepository.findOne.mockResolvedValue(storedToken);
       jest.spyOn(HashUtil, 'compareHash').mockResolvedValue(false);
 
       await expect(service.refresh(refreshToken, user as any)).rejects.toThrow(
         'Invalid refresh token',
+      );
+      expect(mockRefreshTokenRepository.findOne).toHaveBeenCalledWith(
+        { jti: decodedToken.jti },
       );
     });
   });
