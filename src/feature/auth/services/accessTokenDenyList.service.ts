@@ -10,7 +10,7 @@ export class AccessTokenDenyListService {
     private readonly denyListModel: Model<AccessTokenDenyList>,
   ) {}
 
-  async add(jti: string, expiresAt: Date): Promise<void> {
+  async create(jti: string, expiresAt: Date): Promise<void> {
     const createdToken = new this.denyListModel({ jti, expiresAt });
     await createdToken.save();
   }

@@ -6,9 +6,6 @@ export class RefreshToken extends Document {
   @Prop({ required: true, unique: true })
   jti!: string;
 
-  @Prop({ required: true })
-  hashedToken!: string;
-
   @Prop({ required: true, default: false })
   isRevoked!: boolean;
 

@@ -7,8 +7,6 @@ import { JwtService } from '@nestjs/jwt';
 import { AppConfig } from 'src/base/app-config/app.config';
 import { compareHash, hashText } from 'src/common/utils/hash.util';
 import { parseTimeToMilliseconds } from 'src/common/utils/time.util';
-import { AccessTokenDenyListRepository } from 'src/data/repo/access-token-denylist.repository';
-import { RefreshTokenRepository } from 'src/data/repo/refresh-token.repository';
 import { UsersRepository } from 'src/data/repo/users.repository';
 import { UsersService } from 'src/feature/users/users.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -16,13 +14,15 @@ import { CreateUserDto } from '../../users/dto/create-user.dto';
 import { LoginDto } from '../dto/login.dto';
 import { CurrentUser } from '../types/current-user.type';
 import { Tokens } from '../types/tokens.type';
+import { AccessTokenDenyListService } from './accessTokenDenyList.service';
+import { RefreshTokenService } from './refreshToken.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersRepository: UsersRepository,
-    private readonly refreshTokenRepository: RefreshTokenRepository,
-    private readonly accessTokenDenyListRepository: AccessTokenDenyListRepository,
+    private readonly refreshTokenService: RefreshTokenService,
+    private readonly accessTokenDenyService: AccessTokenDenyListService,
     private readonly jwtService: JwtService,
     private readonly appConfig: AppConfig,
     private readonly userService: UsersService,
@@ -76,13 +76,11 @@ export class AuthService {
       }),
     ]);
 
-    const hashedRefreshToken = await hashText(refreshToken);
     const refreshTokenExpirationInMS = parseTimeToMilliseconds(this.appConfig.config.jwt.refreshTokenExpiration);
-    await this.refreshTokenRepository.create({
-      jti: newRefreshTokenId,
-      hashedToken: hashedRefreshToken,
-      expiresAt: new Date(Date.now() + refreshTokenExpirationInMS),
-    });
+    await this.refreshTokenService.create(
+      newRefreshTokenId,
+      new Date(Date.now() + refreshTokenExpirationInMS),
+    );
 
     return { accessToken, refreshToken };
   }
@@ -105,7 +103,7 @@ export class AuthService {
 
   async logout(accessToken: string, refreshTokenJti: string): Promise<void> {
     if (refreshTokenJti) {
-        await this.refreshTokenRepository.updateOne({ jti: refreshTokenJti }, { isRevoked: true });
+        await this.refreshTokenService.revoke(refreshTokenJti);
     }
     if (accessToken) {
       const decodedToken = this.jwtService.decode(accessToken) as {
@@ -116,7 +114,7 @@ export class AuthService {
 
       if (decodedToken && decodedToken.exp) {
         const expiresAt = new Date(decodedToken.exp * 1000);
-        await this.accessTokenDenyListRepository.create({ jti: decodedToken.jti, expiresAt });
+        await this.accessTokenDenyService.create( decodedToken.jti, expiresAt );
       }
     }
   }
@@ -126,18 +124,13 @@ export class AuthService {
     user: CurrentUser,
   ): Promise<Tokens> {
     const decoded = this.jwtService.decode(refreshToken) as { jti: string };
-    const storedToken = await this.refreshTokenRepository.findOne({ jti: decoded.jti });
+    const storedToken = await this.refreshTokenService.findOne(decoded.jti);
 
-    if (!storedToken) {
-      throw new UnauthorizedException('Refresh token not found');
+    if (!storedToken || storedToken?.isRevoked) {
+      throw new UnauthorizedException();
     }
 
-    const isMatch = await compareHash(refreshToken, storedToken.hashedToken);
-    if (!isMatch) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    await this.refreshTokenRepository.updateOne({ _id: storedToken._id }, { isRevoked: true });
+    await this.refreshTokenService.revoke(storedToken.jti);
 
     return this.generateTokens(user);
   }

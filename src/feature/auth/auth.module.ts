@@ -19,6 +19,7 @@ import {
 } from './schemas/refreshToken.schema';
 import { AccessTokenDenyListService } from './services/accessTokenDenyList.service';
 import { AuthService } from './services/auth.service';
+import { RefreshTokenService } from './services/refreshToken.service';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LogoutStrategy } from './strategies/logout.strategy';
@@ -43,7 +44,8 @@ import { LogoutStrategy } from './strategies/logout.strategy';
     LogoutStrategy,
     RefreshTokenRepository,
     AccessTokenDenyListRepository,
-    UsersService
+    UsersService,
+    RefreshTokenService,
   ],
   controllers: [AuthController],
 })
