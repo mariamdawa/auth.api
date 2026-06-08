@@ -48,15 +48,20 @@ Create a `.env` file in the root of the project and add the following environmen
 
 ```env
 # Application
-PORT=3000
+SERVER_HOST=127.0.0.1
+SERVER_PORT=3000
 
 # MongoDB
-MONGO_URI=mongodb://localhost:27017/auth-api
+DATABASE_HOST=localhost
+DATABASE_PORT=27017
+DATABASE_USERNAME=
+DATABASE_PASSWORD=
+DATABASE_NAME=auth-api
 
 # JWT
-JWT_ACCESS_SECRET=your-super-secret-access-key
-JWT_REFRESH_SECRET=your-super-secret-refresh-key
-JWT_ACCESS_EXPIRATION=15m
+JWT_ACCESS_SECRET=__YOUR_ACCESS_SECRET__
+JWT_REFRESH_SECRET=__YOUR_REFRESH_SECRET__
+JWT_ACCESS_EXPIRATION=5m
 JWT_REFRESH_EXPIRATION=7d
 ```
 
