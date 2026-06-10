@@ -1,0 +1,13 @@
+name: Auth API CD
+
+on:
+    push:
+        branches: [main]
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Demo deploy step
+              run: echo " ---- you can replace this with your actual deployment commands ---"
